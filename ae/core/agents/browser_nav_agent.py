@@ -122,6 +122,9 @@ class BrowserNavAgent:
 
         #print(f">>> Function map: {self.browser_nav_executor.function_map}") # type: ignore
 
+        print('%'*100)
+        import json
+        print(json.dumps(self.agent.llm_config["tools"], indent=2))
 
     def __load_additional_skills(self):
         """

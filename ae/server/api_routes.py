@@ -11,9 +11,10 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from pydantic import Field
+from typing import Dict
 
 import ae.core.playwright_manager as browserManager
 from ae.config import SOURCE_LOG_FOLDER_PATH
@@ -21,6 +22,7 @@ from ae.core.agents_llm_config import AgentsLLMConfig
 from ae.core.autogen_wrapper import AutogenWrapper
 from ae.utils.formatting_helper import is_terminating_message
 from ae.utils.ui_messagetype import MessageType
+from .toolbox import TOOLS, call_tool
 
 browser_manager = browserManager.PlaywrightManager(headless=False)
 
@@ -46,6 +48,11 @@ class CommandQueryModel(BaseModel):
     browser_nav_max_chat_round: int = Field(10, description="The maximum number of chat rounds for the browser navigation agent.")
     clientid: str | None = Field(None, description="Client identifier, optional")
     request_originator: str | None = Field(None, description="Optional id of the request originator")
+
+
+class ToolRequest(BaseModel):
+    tool_name: str
+    tool_params: Dict[str, Any]
 
 
 def get_app() -> FastAPI:
@@ -184,6 +191,18 @@ def register_notification_listener(notification_queue: Queue):  # type: ignore
         notification_queue.put(notification)  # type: ignore
 
     browser_manager.notification_manager.register_listener(listener)
+
+
+@app.get("/list-tools", description="List all tools")
+async def list_tools() -> JSONResponse:
+    logger.info("Listing all tools, found %i tools", len(TOOLS))
+    return JSONResponse(content=TOOLS)
+
+
+@app.post("/call-tool", description="Call a tool")
+async def call_tool_(tool_request: ToolRequest) -> JSONResponse:
+    logger.info("Calling tool: %s with params: %s", tool_request.tool_name, tool_request.tool_params)
+    return JSONResponse(content=await call_tool(tool_request.tool_name, tool_request.tool_params))
 
 
 if __name__ == "__main__":

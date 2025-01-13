@@ -166,3 +166,4 @@ ae/testing.py
 
 # All $HOME directory for the chrome browser
 $HOME/
+*.DS_store
