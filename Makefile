@@ -16,10 +16,6 @@ ping-api:
 ping-api-tools:
 	python -c "PORT=${PORT}; import requests, json; print(json.dumps(requests.get(f'http://127.0.0.1:{PORT}/list-tools', headers={'Content-Type': 'application/json'}).json(), indent=2))"
 
-ping-api-tool-call:
-	python -c "PORT=${PORT}; import requests, json; print(json.dumps(requests.post(f'http://127.0.0.1:{PORT}/call-tool', headers={'Content-Type': 'application/json'}, data={'tool_name': 'openurl', 'tool_params': dict(url='https://google.com')}).json(), indent=2))"
-
-
 build:
 	docker build . -t agent-e:local
 
