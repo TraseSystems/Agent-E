@@ -61,7 +61,7 @@ class PlaywrightManager:
         if self.__initialized:
             return
         self.browser_type = browser_type
-        self.isheadless = headless
+        self.isheadless = True
         self.__initialized = True
         self.notification_manager = NotificationManager()
         self.user_response_event = asyncio.Event()

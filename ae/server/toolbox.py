@@ -145,23 +145,25 @@ TOOLS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "description": "Extracts text from a PDF file hosted at the given URL.",
-            "name": "extract_text_from_pdf",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "pdf_url": {
-                        "type": "string",
-                        "description": "The URL of the PDF file to extract text from.",
-                    }
-                },
-                "required": ["pdf_url"],
-            },
-        },
-    },
+    ## we leave this one out b/c we have our own implementation
+    ## this version has the downside of flooding the context window with a bunch of text from large papers
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "description": "Extracts text from a PDF file hosted at the given URL.",
+    #         "name": "extract_text_from_pdf",
+    #         "parameters": {
+    #             "type": "object",
+    #             "properties": {
+    #                 "pdf_url": {
+    #                     "type": "string",
+    #                     "description": "The URL of the PDF file to extract text from.",
+    #                 }
+    #             },
+    #             "required": ["pdf_url"],
+    #         },
+    #     },
+    # },
 ]
 
 

@@ -205,6 +205,12 @@ async def call_tool_(tool_request: ToolRequest) -> JSONResponse:
     return JSONResponse(content=await call_tool(tool_request.tool_name, tool_request.tool_params))
 
 
+@app.post("/reset", description="Reset the browser")
+async def reset() -> JSONResponse:
+    logger.info("Resetting the browser")
+    return JSONResponse(content=await call_tool("openurl", {"url": "https://google.com"}))
+
+
 if __name__ == "__main__":
     logger.info("**********Application Started**********")
     uvicorn.run("main:app", host=HOST, port=PORT, workers=WORKERS, reload=IS_DEBUG, log_level="info")
