@@ -17,6 +17,8 @@ from ae.utils.js_helper import escape_js_message
 from ae.utils.logger import logger
 from ae.utils.ui_messagetype import MessageType
 
+from browserbase import Browserbase
+
 # Enusres that playwright does not wait for font loading when taking screenshots. Reference: https://github.com/microsoft/playwright/issues/28995
 os.environ["PW_TEST_SCREENSHOT_NO_FONTS_READY"] = "1"
 
@@ -133,30 +135,38 @@ class PlaywrightManager:
 
 
     async def create_browser_context(self):
-        user_dir:str = os.environ.get('BROWSER_STORAGE_DIR', '')
+        user_dir: str = os.environ.get('BROWSER_STORAGE_DIR', '')
+        use_browser_base = os.environ.get('BROWSERBASE_ENABLED', None) == 'true'
+
         if self.browser_type == "chromium":
             logger.info(f"User dir: {user_dir}")
-            try:
-                PlaywrightManager._browser_context = await PlaywrightManager._playwright.chromium.launch_persistent_context(user_dir,
-                    channel= "chrome", headless=self.isheadless,
-                    args=["--disable-blink-features=AutomationControlled",
-                        "--disable-session-crashed-bubble",  # disable the restore session bubble
-                        "--disable-infobars",  # disable informational popups,
-                        ],
-                        no_viewport=True
-                )
-            except Exception as e:
-                if "Target page, context or browser has been closed" in str(e):
-                    new_user_dir = tempfile.mkdtemp()
-                    logger.error(f"Failed to launch persistent context with user dir {user_dir}: {e} Trying to launch with a new user dir {new_user_dir}")
-                    PlaywrightManager._browser_context = await PlaywrightManager._playwright.chromium.launch_persistent_context(new_user_dir,
+
+            async def start(user_dir):
+                logger.info("--- Creating a new browser context ---")
+                if not use_browser_base:
+                    PlaywrightManager._browser_context = await PlaywrightManager._playwright.chromium.launch_persistent_context(user_dir,
                         channel= "chrome", headless=self.isheadless,
                         args=["--disable-blink-features=AutomationControlled",
                             "--disable-session-crashed-bubble",  # disable the restore session bubble
                             "--disable-infobars",  # disable informational popups,
                             ],
-                            no_viewport=True
+                            no_viewport=True,
                     )
+                else:
+                    browserbase = Browserbase(api_key=os.environ["BROWSERBASE_API_KEY"])
+                    session = browserbase.sessions.create(project_id=os.environ["BROWSERBASE_PROJECT_ID"], proxies=True)
+                    browser = await PlaywrightManager._playwright.chromium.connect_over_cdp(session.connect_url)
+                    PlaywrightManager._browser_context = browser.contexts[0]
+                    #debug_urls = browserbase.sessions.debug.list(id=session.id)
+                    #logger.info(f"Browser is connected and running here: {debug_urls.debuggerUrl}")
+
+            try:
+                await start(user_dir)
+            except Exception as e:
+                if "Target page, context or browser has been closed" in str(e):
+                    new_user_dir = tempfile.mkdtemp()
+                    logger.error(f"Failed to launch persistent context with user dir {user_dir}: {e} Trying to launch with a new user dir {new_user_dir}")
+                    await start(new_user_dir)
                 elif "Chromium distribution 'chrome' is not found " in str(e):
                     raise ValueError("Chrome is not installed on this device. Install Google Chrome or install playwright using 'playwright install chrome'. Refer to the readme for more information.") from None
                 else:
@@ -166,11 +176,11 @@ class PlaywrightManager:
 
 
     async def get_browser_context(self):
-            """
-            Returns the existing browser context, or creates a new one if it doesn't exist.
-            """
-            await self.ensure_browser_context()
-            return self._browser_context
+        """
+        Returns the existing browser context, or creates a new one if it doesn't exist.
+        """
+        await self.ensure_browser_context()
+        return self._browser_context
 
 
     async def get_current_url(self) -> str | None:
@@ -408,7 +418,7 @@ class PlaywrightManager:
         try:
             await page.wait_for_load_state(state=load_state, timeout=take_snapshot_timeout) # type: ignore
             await page.screenshot(path=screenshot_path, full_page=full_page, timeout=take_snapshot_timeout, caret="initial", scale="device")
-            logger.debug(f"Screen shot saved to: {screenshot_path}")
+            logger.info(f"Screen shot saved to: {screenshot_path}")
         except Exception as e:
             logger.error(f"Failed to take screenshot and save to \"{screenshot_path}\". Error: {e}")
 

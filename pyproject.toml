@@ -28,7 +28,8 @@ dependencies = [
     "nest-asyncio==1.6.0",
     "fastapi==0.111.1",
     "uvicorn==0.30.3",
-    "python-json-logger==2.0.7"
+    "python-json-logger==2.0.7",
+    "browserbase==1.0.5",
 ]
 
 [project.optional-dependencies]

@@ -36,6 +36,15 @@ def configure_logger(level: str = "INFO") -> None:
     logger.handlers = []  # Clear existing handlers
     logger.addHandler(handler)
 
+    # Create and configure file handler
+    log_file = os.environ.get("LOG_FILE", None)
+    print(f"Log file: {log_file}")
+    if log_file is not None:
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(level.upper())
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
     # Ensure other loggers have the same handler
     http_loggers = ["openai", "autogen"]
     for http_logger in http_loggers:
@@ -66,6 +75,7 @@ def set_log_level(level: str) -> None:
 logging.getLogger("matplotlib.pyplot").setLevel(logging.WARNING)
 logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARNING)
 logging.getLogger("PIL.Image").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
 
 # Re-export the logger for ease of use
 __all__ = ["logger", "set_log_level"]

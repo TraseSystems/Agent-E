@@ -2,6 +2,7 @@ import os
 import time
 from typing import Annotated
 from typing import Any
+import tempfile
 
 from playwright.async_api import Page
 
@@ -67,8 +68,35 @@ async def get_dom_with_content_type(
         text_content = await get_filtered_text_content(page)
         with open(os.path.join(SOURCE_LOG_FOLDER_PATH, 'text_only_dom.txt'), 'w',  encoding='utf-8') as f:
             f.write(text_content)
-        extracted_data = text_content
+        extracted_data = str(text_content)
+
+        if len(extracted_data) > 20_000: # 20k ~= 7000 tokens
+            # save to a text file
+            outfile = tempfile.mktemp(prefix='page-text-content-', suffix=".txt")
+            with open(outfile, 'w+', encoding='utf-8') as f:
+                f.write(extracted_data)
+            extracted_data = f"""The page text was too large to display, so it was saved to this text file: {outfile}
+
+A preview of the text content is shown below:
+
+{extracted_data[:1000]}...
+
+To analyze the full text content, use your `python_interpreter` tool to read the file contents."""
+
+        video_urls = await get_video_urls(page)
+        pdf_urls = await get_pdf_urls(page)
+        extracted_data += f"\n\nThis is the list of video URLs on the page in the order they appear: {str(video_urls)}"
+        extracted_data += f"\n\nThis is the list of PDF URLs on the page in the order they appear: {str(pdf_urls)}"
+
         user_success_message = "Fetched the text content of the DOM"
+    # elif content_type == "video_urls":
+    #     logger.debug('Fetching DOM for video_urls')
+    #     video_urls = await get_video_urls(page)
+    #     extracted_data = f"This is the list of video URLs on the page in the order they appear: {str(video_urls)}"
+    # elif content_type == "pdf_urls":
+    #     logger.debug('Fetching DOM for pdf_urls')
+    #     pdf_urls = await get_pdf_urls(page)
+    #     extracted_data = f"This is the list of PDF URLs on the page in the order they appear: {str(pdf_urls)}"
     else:
         raise ValueError(f"Unsupported content_type: {content_type}")
 
@@ -113,3 +141,56 @@ async def get_filtered_text_content(page: Page) -> str:
     """)
     return text_content
 
+
+def ordered_unique_urls(urls: list):
+    if not isinstance(urls, list):
+        logger.warning(f"Expected a list of URLs, but got {type(urls)}")
+        return []
+
+    # Filter out empty entries
+    urls = [url for url in urls if url]
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique_urls = []
+    for url in urls:
+        if url not in seen:
+            unique_urls.append(url)
+            seen.add(url)
+    return unique_urls
+
+
+async def get_video_urls(page: Page) -> list[str]:
+    urls = await page.evaluate("""
+    () => {
+        return Array.from(
+            document.querySelectorAll(
+                // Grab elements that have src containing .gif, .mp4, .mov
+                'img[src*=".gif"], img[src*=".GIF"], ' +
+                'video[src*=".mp4"], video[src*=".MP4"], video[src*=".mov"], video[src*=".MOV"], ' +
+                'source[src*=".mp4"], source[src*=".MP4"], source[src*=".mov"], source[src*=".MOV"]'
+            ),
+            el => el.src
+        );
+    }
+    """)
+    return ordered_unique_urls(urls)
+
+
+async def get_pdf_urls(page: Page) -> list[str]:
+    urls = await page.evaluate("""
+    () => {
+      return Array.from(
+        document.querySelectorAll('a[href*=".pdf"], a[href*=".PDF"], img[src*=".pdf"], img[src*=".PDF"]'),
+        el => {
+          if (el.tagName.toLowerCase() === 'a') {
+            return el.href;
+          } else if (el.tagName.toLowerCase() === 'img') {
+            return el.src;
+          }
+          return '';
+        }
+      );
+    }
+    """)
+    return ordered_unique_urls(urls)
