@@ -3,6 +3,7 @@ import time
 from typing import Annotated
 from typing import Any
 import tempfile
+import json
 
 from playwright.async_api import Page
 
@@ -12,6 +13,35 @@ from ae.utils.dom_helper import wait_for_non_loading_dom_state
 from ae.utils.get_detailed_accessibility_tree import do_get_accessibility_info
 from ae.utils.logger import logger
 from ae.utils.ui_messagetype import MessageType
+
+
+def truncate_fields(fields: dict[str, Any], url: str = "") -> dict[str, Any] | str:
+    # this should only happen in extreme cases
+    if len(str(fields)) > 40_000:
+        outfile = tempfile.mktemp(prefix='page-dom-content-', suffix=".json")
+        with open(outfile, 'w+', encoding='utf-8') as f:
+            json.dump(fields, f, indent=2)
+
+        logger.warning(f"DOM content was too large to display for {url}, saved to {outfile}")
+
+        msg = f"""The page DOM was too large to display, so it was saved to this JSON file: {outfile}
+
+A preview of the DOM content is shown below:
+
+{json.dumps(fields, indent=2)[:1000]}...
+        
+To analyze the full text content, use your `python_interpreter` tool to read the file contents using:
+
+```
+import json
+with open('{outfile}', 'r') as f:
+    dom_content = json.load(f)
+```
+"""
+        logger.warning(msg)
+        return msg
+    else:
+        return fields
 
 
 async def get_dom_with_content_type(
@@ -56,11 +86,13 @@ async def get_dom_with_content_type(
     if content_type == 'all_fields':
         user_success_message = "Fetched all the fields in the DOM"
         extracted_data = await do_get_accessibility_info(page, only_input_fields=False)
+        extracted_data = truncate_fields(extracted_data)
     elif content_type == 'input_fields':
         logger.debug('Fetching DOM for input_fields')
         extracted_data = await do_get_accessibility_info(page, only_input_fields=True)
         if extracted_data is None:
             return "Could not fetch input fields. Please consider trying with content_type all_fields."
+        extracted_data = truncate_fields(extracted_data)
         user_success_message = "Fetched only input fields in the DOM"
     elif content_type == 'text_only':
         # Extract text from the body or the highest-level element

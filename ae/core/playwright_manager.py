@@ -100,15 +100,18 @@ class PlaywrightManager:
         """
         if self._browser_context is None:
             await self.create_browser_context()
+        logger.debug("Browser context ensured.")
 
 
     async def setup_handlers(self):
         """
         Setup various handlers after the browser context has been ensured.
         """
+        logger.info("Setting up handlers")
         await self.set_overlay_state_handler()
         await self.set_user_response_handler()
         await self.set_navigation_handler()
+        logger.info("Handlers set up successfully.")
 
 
     async def start_playwright(self):
@@ -135,15 +138,16 @@ class PlaywrightManager:
 
 
     async def create_browser_context(self):
+        logger.info("--- Creating a new browser context ---")
+
         user_dir: str = os.environ.get('BROWSER_STORAGE_DIR', '')
-        use_browser_base = os.environ.get('BROWSERBASE_ENABLED', None) == 'true'
 
         if self.browser_type == "chromium":
             logger.info(f"User dir: {user_dir}")
 
             async def start(user_dir):
-                logger.info("--- Creating a new browser context ---")
-                if not use_browser_base:
+                if 0:
+                    logger.info("Using local browser")
                     PlaywrightManager._browser_context = await PlaywrightManager._playwright.chromium.launch_persistent_context(user_dir,
                         channel= "chrome", headless=self.isheadless,
                         args=["--disable-blink-features=AutomationControlled",
@@ -152,16 +156,22 @@ class PlaywrightManager:
                             ],
                             no_viewport=True,
                     )
-                else:
+                elif 1:
+                    logger.info("Using browserbase")
                     browserbase = Browserbase(api_key=os.environ["BROWSERBASE_API_KEY"])
                     session = browserbase.sessions.create(project_id=os.environ["BROWSERBASE_PROJECT_ID"], proxies=True)
                     browser = await PlaywrightManager._playwright.chromium.connect_over_cdp(session.connect_url)
                     PlaywrightManager._browser_context = browser.contexts[0]
                     #debug_urls = browserbase.sessions.debug.list(id=session.id)
                     #logger.info(f"Browser is connected and running here: {debug_urls.debuggerUrl}")
+                elif 0:
+                    logger.info("Using Bright Data")
+                    browser = await PlaywrightManager._playwright.chromium.connect_over_cdp(os.environ["BRIGHT_BROWSER_PROXY"])
+                    PlaywrightManager._browser_context = browser.contexts[0]
 
             try:
                 await start(user_dir)
+                logger.info("Browser context created successfully.")
             except Exception as e:
                 if "Target page, context or browser has been closed" in str(e):
                     new_user_dir = tempfile.mkdtemp()
@@ -179,6 +189,7 @@ class PlaywrightManager:
         """
         Returns the existing browser context, or creates a new one if it doesn't exist.
         """
+        logger.debug("Getting browser context")
         await self.ensure_browser_context()
         return self._browser_context
 
@@ -251,7 +262,9 @@ class PlaywrightManager:
 
 
     async def go_to_homepage(self):
+        logger.info("Navigating to homepage")
         page:Page = await PlaywrightManager.get_current_page(self)
+        logger.info(f"Current page: {page.url}")
         await page.goto(self._homepage)
 
 
