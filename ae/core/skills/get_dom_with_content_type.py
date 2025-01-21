@@ -17,12 +17,14 @@ from ae.utils.ui_messagetype import MessageType
 
 def truncate_fields(fields: dict[str, Any], url: str = "") -> dict[str, Any] | str:
     # this should only happen in extreme cases
-    if len(str(fields)) > 40_000:
+    n_chars = len(str(fields))
+    #if n_chars > 40_000: ## wikipedia gets truncated at 40k
+    if n_chars > 100_000:
         outfile = tempfile.mktemp(prefix='page-dom-content-', suffix=".json")
         with open(outfile, 'w+', encoding='utf-8') as f:
             json.dump(fields, f, indent=2)
 
-        logger.warning(f"DOM content was too large to display for {url}, saved to {outfile}")
+        logger.warning(f"DOM content was too large to display for {url}, saved to {outfile}, n_chars: {n_chars}")
 
         msg = f"""The page DOM was too large to display, so it was saved to this JSON file: {outfile}
 
@@ -38,7 +40,6 @@ with open('{outfile}', 'r') as f:
     dom_content = json.load(f)
 ```
 """
-        logger.warning(msg)
         return msg
     else:
         return fields
@@ -81,7 +82,7 @@ async def get_dom_with_content_type(
         raise ValueError('No active page found. OpenURL command opens a new page.')
 
     extracted_data = None
-    await wait_for_non_loading_dom_state(page, 2000) # wait for the DOM to be ready, non loading means external resources do not need to be loaded
+    await wait_for_non_loading_dom_state(page, 4000) # wait for the DOM to be ready, non loading means external resources do not need to be loaded
     user_success_message = ""
     if content_type == 'all_fields':
         user_success_message = "Fetched all the fields in the DOM"
@@ -117,25 +118,19 @@ To analyze the full text content, use your `python_interpreter` tool to read the
 
         video_urls = await get_video_urls(page)
         pdf_urls = await get_pdf_urls(page)
+        #img_urls = await get_image_alt_urls(page)
         extracted_data += f"\n\nThis is the list of video URLs on the page in the order they appear: {str(video_urls)}"
         extracted_data += f"\n\nThis is the list of PDF URLs on the page in the order they appear: {str(pdf_urls)}"
+        #extracted_data += f"\n\nThese are the images along with their alt tags found on the page: {str(img_urls)}"
 
         user_success_message = "Fetched the text content of the DOM"
-    # elif content_type == "video_urls":
-    #     logger.debug('Fetching DOM for video_urls')
-    #     video_urls = await get_video_urls(page)
-    #     extracted_data = f"This is the list of video URLs on the page in the order they appear: {str(video_urls)}"
-    # elif content_type == "pdf_urls":
-    #     logger.debug('Fetching DOM for pdf_urls')
-    #     pdf_urls = await get_pdf_urls(page)
-    #     extracted_data = f"This is the list of PDF URLs on the page in the order they appear: {str(pdf_urls)}"
     else:
         raise ValueError(f"Unsupported content_type: {content_type}")
 
     elapsed_time = time.time() - start_time
     logger.info(f"Get DOM Command executed in {elapsed_time} seconds")
     await browser_manager.notify_user(user_success_message, message_type=MessageType.ACTION)
-    return extracted_data # type: ignore
+    return str(extracted_data) # case to string for DOM JSON
 
 
 async def get_filtered_text_content(page: Page) -> str:
@@ -226,3 +221,18 @@ async def get_pdf_urls(page: Page) -> list[str]:
     }
     """)
     return ordered_unique_urls(urls)
+
+
+async def get_image_alt_urls(page: Page) -> list[dict]:
+    images = await page.evaluate("""
+    () => {
+        // Select all image elements on the page
+        const imgs = document.querySelectorAll('img');
+        // Map each image to an object containing its alt text and source URL
+        return Array.from(imgs, img => ({
+            alt: img.alt,
+            url: img.src
+        }));
+    }
+    """)
+    return images

@@ -69,6 +69,8 @@ class PlaywrightManager:
         self.user_response_event = asyncio.Event()
         if gui_input_mode:
             self.ui_manager: UIManager = UIManager()
+        else:
+            self.ui_manager = None
 
         self.set_take_screenshots(take_screenshots)
         self.set_screenshots_dir(screenshots_dir)
@@ -166,7 +168,7 @@ class PlaywrightManager:
                     #logger.info(f"Browser is connected and running here: {debug_urls.debuggerUrl}")
                 elif 0:
                     logger.info("Using Bright Data")
-                    browser = await PlaywrightManager._playwright.chromium.connect_over_cdp(os.environ["BRIGHT_BROWSER_PROXY"])
+                    browser = await PlaywrightManager._playwright.chromium.connect_over_cdp(os.environ["BRIGHT_BROWSER_PROXY_PWT"])
                     PlaywrightManager._browser_context = browser.contexts[0]
 
             try:
@@ -270,7 +272,8 @@ class PlaywrightManager:
 
     async def set_navigation_handler(self):
         page:Page = await PlaywrightManager.get_current_page(self)
-        page.on("domcontentloaded", self.ui_manager.handle_navigation) # type: ignore
+        if self.ui_manager is not None:
+            page.on("domcontentloaded", self.ui_manager.handle_navigation) # type: ignore
         page.on("domcontentloaded", handle_navigation_for_mutation_observer) # type: ignore
         await page.expose_function("dom_mutation_change_detected", dom_mutation_change_detected) # type: ignore
 
@@ -294,7 +297,6 @@ class PlaywrightManager:
         context = await self.get_browser_context()
         await context.expose_function('user_response', self.receive_user_response) # type: ignore
 
-
     async def notify_user(self, message: str, message_type: MessageType = MessageType.STEP):
         """
         Notify the user with a message.
@@ -304,6 +306,9 @@ class PlaywrightManager:
             message_type (enum, optional): Values can be 'PLAN', 'QUESTION', 'ANSWER', 'INFO', 'STEP'. Defaults to 'STEP'.
             To Do: Convert to Enum.
         """
+
+        if self.ui_manager is None:
+            return
 
         if message.startswith(":"):
             message = message[1:]
@@ -429,6 +434,7 @@ class PlaywrightManager:
         screenshot_name += ".png"
         screenshot_path = f"{self.get_screenshots_dir()}/{screenshot_name}"
         try:
+            logger.info("Saving screenshot (AE): %s", screenshot_path)
             await page.wait_for_load_state(state=load_state, timeout=take_snapshot_timeout) # type: ignore
             await page.screenshot(path=screenshot_path, full_page=full_page, timeout=take_snapshot_timeout, caret="initial", scale="device")
             logger.info(f"Screen shot saved to: {screenshot_path}")

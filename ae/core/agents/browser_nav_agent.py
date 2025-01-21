@@ -4,7 +4,7 @@ from datetime import datetime
 from string import Template
 from typing import Any
 
-import autogen  # type: ignore
+#import autogen  # type: ignore
 
 from ae.core.memory.static_ltm import get_user_ltm
 from ae.core.prompts import LLM_PROMPTS
@@ -25,7 +25,7 @@ from ae.utils.logger import logger
 
 
 class BrowserNavAgent:
-    def __init__(self, model_config_list, llm_config_params: dict[str, Any], system_prompt: str|None, browser_nav_executor: autogen.UserProxyAgent): # type: ignore
+    def __init__(self, model_config_list, llm_config_params: dict[str, Any], system_prompt: str|None, browser_nav_executor): # type: ignore
         """
         Initialize the BrowserNavAgent and store the AssistantAgent instance
         as an instance attribute for external access.
@@ -52,15 +52,15 @@ class BrowserNavAgent:
             user_ltm = "\n" + user_ltm
             system_message = Template(system_message).substitute(basic_user_information=user_ltm)
         logger.info(f"Browser nav agent using model: {model_config_list[0]['model']}")
-        self.agent = autogen.ConversableAgent(
-            name="browser_navigation_agent",
-            system_message=system_message,
-            llm_config={
-                "config_list": model_config_list,
-                **llm_config_params #unpack all the name value pairs in llm_config_params as is
-            },
-        )
-        self.__register_skills()
+        # self.agent = autogen.ConversableAgent(
+        #     name="browser_navigation_agent",
+        #     system_message=system_message,
+        #     llm_config={
+        #         "config_list": model_config_list,
+        #         **llm_config_params #unpack all the name value pairs in llm_config_params as is
+        #     },
+        # )
+        # self.__register_skills()
 
 
     def __get_ltm(self):

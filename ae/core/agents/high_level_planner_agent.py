@@ -3,8 +3,8 @@ from datetime import datetime
 from string import Template
 from typing import Any
 
-import autogen  # type: ignore
-from autogen import ConversableAgent  # type: ignore
+#import autogen  # type: ignore
+#from autogen import ConversableAgent  # type: ignore
 
 from ae.core.memory.static_ltm import get_user_ltm
 from ae.core.post_process_responses import final_reply_callback_planner_agent as print_message_as_planner  # type: ignore
@@ -14,7 +14,7 @@ from ae.utils.logger import logger
 
 
 class PlannerAgent:
-    def __init__(self, model_config_list, llm_config_params: dict[str, Any], system_prompt: str|None, user_proxy_agent:ConversableAgent): # type: ignore
+    def __init__(self, model_config_list, llm_config_params: dict[str, Any], system_prompt: str|None, user_proxy_agent): #:ConversableAgent): # type: ignore
         """
         Initialize the PlannerAgent and store the AssistantAgent instance
         as an instance attribute for external access.

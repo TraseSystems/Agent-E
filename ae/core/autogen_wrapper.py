@@ -7,7 +7,7 @@ from string import Template
 from time import time_ns
 from typing import Any
 
-import autogen  # type: ignore
+#import autogen  # type: ignore
 import nest_asyncio  # type: ignore
 import openai
 
@@ -44,7 +44,7 @@ class AutogenWrapper:
         self.planner_number_of_rounds = planner_max_chat_round
         self.browser_number_of_rounds = browser_nav_max_chat_round
 
-        self.agents_map: dict[str, UserProxyAgent_SequentialFunctionExecution | autogen.AssistantAgent | autogen.ConversableAgent ] | None = None
+        self.agents_map: dict[str, UserProxyAgent_SequentialFunctionExecution ] | None = None # | autogen.AssistantAgent | autogen.ConversableAgent 
 
         self.planner_agent_model_config : list[dict[str, str]] | None = None
         self.browser_nav_agent_model_config : list[dict[str, str]] | None = None
@@ -100,7 +100,7 @@ class AutogenWrapper:
 
         self.agents_map = await self.__initialize_agents(agents_needed)
 
-        def trigger_nested_chat(manager: autogen.ConversableAgent):
+        def trigger_nested_chat(manager): # : autogen.ConversableAgent
             content:str=manager.last_message()["content"] # type: ignore
             content_json = parse_response(content) # type: ignore
             next_step = content_json.get('next_step', None)
@@ -118,7 +118,7 @@ class AutogenWrapper:
         def get_url() -> str:
             return asyncio.run(geturl())
 
-        def my_custom_summary_method(sender: autogen.ConversableAgent,recipient: autogen.ConversableAgent, summary_args: dict ) : # type: ignore
+        def my_custom_summary_method(sender, recipient, summary_args: dict ) : # type: ignore # : autogen.ConversableAgent,recipient: autogen.ConversableAgent
             messages_str_keys = {str(key): value for key, value in sender.chat_messages.items()} # type: ignore
             self.__save_chat_log(list(messages_str_keys.values())[0]) # type: ignore
             last_message=recipient.last_message(sender)["content"] # type: ignore
@@ -168,6 +168,7 @@ class AutogenWrapper:
             json.dump(env_var, temp)
             temp_file_path = temp.name
 
+        raise NotImplementedError("This method is not implemented yet")
         return autogen.config_list_from_json(env_or_file=temp_file_path)
 
     def get_chat_logs_dir(self) -> str|None:
@@ -212,7 +213,7 @@ class AutogenWrapper:
             dict: A dictionary of agent instances.
 
         """
-        agents_map: dict[str, UserProxyAgent_SequentialFunctionExecution  | autogen.ConversableAgent]= {}
+        agents_map: dict[str, UserProxyAgent_SequentialFunctionExecution  ]= {} # | autogen.ConversableAgent
 
         user_delegate_agent = await self.__create_user_delegate_agent()
         agents_map["user"] = user_delegate_agent
@@ -234,7 +235,7 @@ class AutogenWrapper:
         return agents_map
 
 
-    async def __create_user_delegate_agent(self) -> autogen.ConversableAgent:
+    async def __create_user_delegate_agent(self): #:-> autogen.ConversableAgent:
         """
         Create a ConversableAgent instance.
 
@@ -314,7 +315,7 @@ class AutogenWrapper:
         print(">>> Created browser_nav_executor_agent:", browser_nav_executor_agent)
         return browser_nav_executor_agent
 
-    def __create_browser_nav_agent(self, user_proxy_agent: UserProxyAgent_SequentialFunctionExecution) -> autogen.ConversableAgent:
+    def __create_browser_nav_agent(self, user_proxy_agent: UserProxyAgent_SequentialFunctionExecution): #-> autogen.ConversableAgent:
         """
         Create a BrowserNavAgent instance.
 
@@ -330,7 +331,7 @@ class AutogenWrapper:
         #print(">>> browser agent tools:", json.dumps(browser_nav_agent.agent.llm_config.get("tools"), indent=2))
         return browser_nav_agent.agent
 
-    def __create_planner_agent(self, assistant_agent: autogen.ConversableAgent):
+    def __create_planner_agent(self, assistant_agent): #: autogen.ConversableAgent):
         """
         Create a Planner Agent instance. This is mainly used for exploration at this point
 
@@ -342,7 +343,7 @@ class AutogenWrapper:
                                      self.planner_agent_config["other_settings"].get("system_prompt", None), assistant_agent) # type: ignore
         return planner_agent.agent
 
-    async def process_command(self, command: str, current_url: str | None = None) -> autogen.ChatResult | None:
+    async def process_command(self, command: str, current_url: str | None = None): #-> autogen.ChatResult | None:
         """
         Process a command by sending it to one or more agents.
 

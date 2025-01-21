@@ -7,7 +7,7 @@ from playwright.async_api import ConsoleMessage
 from ae.core.playwright_manager import PlaywrightManager
 from ae.utils.logger import logger
 from ae.utils.ui_messagetype import MessageType
-
+from ae.utils.screenshot_helper import screenshot_page
 
 class SolveState:
     """
@@ -36,6 +36,18 @@ class SolveState:
             logger.info("AI solved the CAPTCHA!")
             return
 
+async def attempt_goto(page, url, timeout):
+    # BrowserBase rec: 60 seconds is a good timeout for most pages (for no CAPTCHA, you need to wait this long to proceed)
+    await page.goto(url, timeout=timeout*1000) # type: ignore
+    logger.info("page.goto finished, waiting for CAPTCHA messages. url=%s", url)
+
+    async with page.expect_console_message(
+        lambda msg: msg.text == SolveState.END_MSG,
+        timeout=30_000,
+    ):
+        # Wait until the END_MSG console message is observed or times out.
+        pass
+
 
 async def openurl(url: Annotated[str, "The URL to navigate to. Value must include the protocol (http:// or https://)."],
             timeout: Annotated[int, "Additional wait time in seconds after initial load."] = 60) -> Annotated[str, "Returns the result of this request in text form"]:
@@ -57,7 +69,10 @@ async def openurl(url: Annotated[str, "The URL to navigate to. Value must includ
     browser_manager = PlaywrightManager(browser_type='chromium', headless=False)
     await browser_manager.get_browser_context()
     page = await browser_manager.get_current_page()
+    
     state = SolveState()
+    page.on("console", state.handle_console)
+    
     try:
         url = ensure_protocol(url)
         if page.url == url:
@@ -70,39 +85,50 @@ async def openurl(url: Annotated[str, "The URL to navigate to. Value must includ
         
         await browser_manager.take_screenshots(f"{function_name}_start", page)
 
-        # BrowserBase rec: 60 seconds is a good timeout for most pages
-        await page.goto(url, timeout=timeout*1000) # type: ignore
-
-        # async with page.expect_console_message(
-        #     lambda msg: msg.text == SolveState.END_MSG,
-        #     timeout=10000,
-        # ):
-        #     # Wait until the END_MSG console message is observed or times out.
-        #     pass
+        await attempt_goto(page, url, timeout)
 
     except PlaywrightTimeoutError as pte:
-        logger.warn(f"Initial navigation to {url} failed: {pte}. Will try to continue anyway.") # happens more often than not, but does not seem to be a problem
-        logger.info(f"Solve state: started={state.started} finished={state.finished}")
+        logger.warning(f"Initial navigation to {url} failed: {pte}. Will try to continue anyway.") # happens more often than not, but does not seem to be a problem
+        if state.started:
+            logger.error(f"CAPTCHA started solving but didn't finish: started={state.started} finished={state.finished}, url={url}")
     except Exception as e:
         logger.error(f"An error occurred while opening the URL: {url}. Error: {e}")
-        import traceback
-        traceback.print_exc()
 
-    # # If we didn't see both a start and finish message, raise an error.
-    # if state.started != state.finished:
-    #     logger.error(f"Solving mismatch! started={state.started} finished={state.finished}")
-    # if not state.started and not state.finished:
-    #     logger.info("No CAPTCHA was presented, or was solved too quick to see.")
-    # else:
-    #     logger.info("CAPTCHA is complete.")
+        if 'Target page, context or browser has been closed' in str(e):
+            logger.error(f"Something was closed while opening the URL, so retrying a second time. url={url}, error={e}")
+            state.started = False
+            state.finished = False
+            try:
+                await attempt_goto(page, url, timeout)
+                logger.info(f"Successfully opened the URL a second time. url={url}")
+            except:
+                logger.error(f"An error occurred while opening the URL a second time. url={url}, error={e}")
+                traceback.print_exc()
+
+    # If we didn't see both a start and finish message, raise an error.
+    if state.started == state.finished == False:
+        logger.warning("No CAPTCHA was presented, or was solved too quick to see. url=%s", url)
+    else:
+        logger.info("CAPTCHA is complete, url=%s", url)
+
+    logger.info("Waiting for body to load, url=%s", url)
+    await page.locator("body").wait_for(state="visible")
 
     await browser_manager.take_screenshots(f"{function_name}_end", page)
 
     await browser_manager.notify_user(f"Opened URL: {url}", message_type=MessageType.ACTION)
+
     # Get the page title
     title = await page.title()
     url = page.url
-    return f"Page loaded: {url}, Title: '{title}'"
+
+    text = f"Page loaded: {url}, Title: '{title}'"
+    screenshot_msg = await screenshot_page(page)
+    return [
+        {"type": "text", "text": text},
+        screenshot_msg,
+    ]
+    
 
 def ensure_protocol(url: str) -> str:
     """

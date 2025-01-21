@@ -2,7 +2,7 @@ import os
 from typing import Annotated
 
 import httpx
-import pdfplumber
+#import pdfplumber
 
 from ae.config import PROJECT_TEMP_PATH
 from ae.core.playwright_manager import PlaywrightManager

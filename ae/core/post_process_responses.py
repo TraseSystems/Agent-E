@@ -1,14 +1,14 @@
 import asyncio
 from typing import Any
 
-import autogen  # type: ignore
+#import autogen  # type: ignore
 
 from ae.core.playwright_manager import PlaywrightManager
 from ae.utils.logger import logger
 from ae.utils.ui_messagetype import MessageType
 
 
-def final_reply_callback_user_proxy(recipient: autogen.ConversableAgent, messages: list[dict[str, Any]], sender: autogen.Agent, config: dict[str, Any]):
+def final_reply_callback_user_proxy(recipient, messages: list[dict[str, Any]], sender, config: dict[str, Any]):
     """
     Callback function that is called each time the user proxy agent receives a message.
     It picks the last message from the list of messages and checks if it contains the termination signal.
